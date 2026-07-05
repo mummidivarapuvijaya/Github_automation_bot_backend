@@ -1,0 +1,70 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  githubId     Int          @unique
+  username     String
+  avatarUrl    String
+  accessToken  String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  repositories Repository[]
+}
+
+model Repository {
+  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+  githubId        Int            @unique
+  owner           String
+  name            String
+  webhookId       String?
+  webhookSecret   String
+  slackWebhookUrl String?
+  userId          String?    // made optional
+  user            User?      @relation(fields: [userId], references: [id])
+  rules           Rule[]
+  logs            BotActionLog[]
+  createdAt       DateTime       @default(now())
+}
+
+model Rule {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  name         String
+  triggerEvent String     // e.g. "issues", "pull_request"
+  conditions   String     // JSON serialized: { keyword: string, author: string, label: string }
+  actions      String     // JSON serialized: { comment: string, label: string, slack: boolean, ai: boolean }
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+}
+
+model WebhookDelivery {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  deliveryId  String   @unique
+  processedAt DateTime @default(now())
+}
+
+model BotActionLog {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  deliveryId   String
+  eventType    String     // e.g. "issues.opened", "pull_request.opened"
+  title        String
+  author       String
+  url          String
+  status       String     // "success", "error", "skipped"
+  errorDetails String?
+  aiSummary    String?
+  aiPriority   String?
+  aiSentiment  String?
+  actionsTaken String     // JSON serialized array of action logs: e.g. ["Added label bug", "Posted comment", "Slack notified"]
+  createdAt    DateTime   @default(now())
+}
